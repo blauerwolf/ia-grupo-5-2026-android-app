@@ -61,13 +61,11 @@ class SignLanguageScreen extends StatefulWidget {
   State<SignLanguageScreen> createState() => _SignLanguageScreenState();
 }
 
-class _SignLanguageScreenState extends State<SignLanguageScreen>
-    with SingleTickerProviderStateMixin {
+class _SignLanguageScreenState extends State<SignLanguageScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
-  bool _isAutoDetect = true;
   
   // Parámetros de Calibración
   double _cropFraction = 0.5;
@@ -77,44 +75,23 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
   // Clasificador TFLite Condicional
   TfliteClassifier? _tfliteClassifier;
   bool _isTfliteModelLoaded = false;
-  // Control de inferencia en tiempo real
-  DateTime? _lastFrameProcessed; // throttle del stream
-  bool _captureNextFrame = false; // flag para modo manual
 
   // Resultados de Predicción
   String _detectedLetter = '-';
   double _confidence = 0.0;
   String _statusMessage = 'Iniciando...';
   
-  // Animación del escáner láser
-  late AnimationController _scannerAnimationController;
-  late Animation<double> _scannerAnimation;
-
   @override
   void initState() {
     super.initState();
-    
-    // Configurar animación del escáner láser
-    _scannerAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
-    
-    _scannerAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _scannerAnimationController, curve: Curves.easeInOut),
-    );
-
     _initializeCamera();
     _initializeTflite();
-    // El stream de cámara se inicia en _initializeCamera() tras la inicialización.
   }
 
   @override
   void dispose() {
-    try { _cameraController?.stopImageStream(); } catch (_) {}
     _cameraController?.dispose();
     _tfliteClassifier?.close();
-    _scannerAnimationController.dispose();
     super.dispose();
   }
 
@@ -177,9 +154,6 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
       selectedCamera,
       ResolutionPreset.medium,
       enableAudio: false,
-      // YUV420: el plano Y es el canal de luminancia (grayscale) directamente.
-      // Evita la codificación JPEG del stream, que causaba ImageCaptureException.
-      imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
     try {
@@ -187,11 +161,8 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
+          _statusMessage = 'Cámara lista';
         });
-        // Iniciar stream de frames para inferencia en tiempo real.
-        // startImageStream() es más robusto que takePicture() en loop:
-        // no interrumpe la sesión de la cámara y no causa ImageCaptureException.
-        await _cameraController!.startImageStream(_onCameraFrame);
       }
     } catch (e) {
       if (mounted) {
@@ -202,117 +173,52 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
     }
   }
 
-  /// Callback del stream de cámara. Decide si procesar el frame según el modo activo.
-  void _onCameraFrame(CameraImage cameraImage) {
+  /// Captura una foto y realiza la inferencia TFLite offline de manera asíncrona.
+  Future<void> _captureAndAnalyze() async {
+    if (_cameraController == null || !_isCameraInitialized) return;
     if (!_isTfliteModelLoaded || _isProcessing) return;
 
-    if (_isAutoDetect) {
-      // Modo automático: throttle a ~1.5 fps para no saturar el hilo principal.
-      final now = DateTime.now();
-      if (_lastFrameProcessed != null &&
-          now.difference(_lastFrameProcessed!) < const Duration(milliseconds: 650)) {
-        return;
-      }
-      _lastFrameProcessed = now;
-    } else {
-      // Modo manual: solo procesar cuando el usuario presionó el botón.
-      if (!_captureNextFrame) return;
-      _captureNextFrame = false;
-    }
-
-    _processFrameFromStream(cameraImage);
-  }
-
-  /// Extrae el canal de luminancia del frame y lanza la inferencia TFLite.
-  void _processFrameFromStream(CameraImage cameraImage) {
-    _isProcessing = true;
-    if (!_isAutoDetect && mounted) setState(() {});
-
-    Uint8List yPlane;
-    final int width = cameraImage.width;
-    final int height = cameraImage.height;
-    int bytesPerRow;
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = 'Capturando imagen...';
+    });
 
     try {
-      if (cameraImage.format.group == ImageFormatGroup.yuv420 ||
-          cameraImage.format.group == ImageFormatGroup.nv21) {
-        // Android YUV420/NV21: el plano Y [0] es el canal de luminancia (grayscale directo).
-        final plane = cameraImage.planes[0];
-        yPlane = plane.bytes;
-        bytesPerRow = plane.bytesPerRow;
-      } else if (cameraImage.format.group == ImageFormatGroup.bgra8888) {
-        // iOS/macOS BGRA: convertir a grayscale manualmente.
-        final bytes = cameraImage.planes[0].bytes;
-        final bpr = cameraImage.planes[0].bytesPerRow;
-        final grayscale = Uint8List(width * height);
-        for (int row = 0; row < height; row++) {
-          for (int col = 0; col < width; col++) {
-            final int i = row * bpr + col * 4;
-            final int b = bytes[i];
-            final int g = bytes[i + 1];
-            final int r = bytes[i + 2];
-            grayscale[row * width + col] =
-                (r * 0.299 + g * 0.587 + b * 0.114).round().clamp(0, 255);
-          }
-        }
-        yPlane = grayscale;
-        bytesPerRow = width;
-      } else {
-        debugPrint('[Cam] Formato no soportado: ${cameraImage.format.group}');
-        _isProcessing = false;
-        return;
+      final XFile photo = await _cameraController!.takePicture();
+      final Uint8List bytes = await photo.readAsBytes();
+      
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = 'Analizando seña...';
+      });
+
+      final result = await _tfliteClassifier!.predict(bytes);
+      if (result['success'] == true && mounted) {
+        final double conf = (result['confidence'] as double?) ?? 0.0;
+        setState(() {
+          _detectedLetter = result['letter'] ?? '-';
+          _confidence = conf;
+          _statusMessage = 'Inferencia finalizada';
+        });
+      } else if (mounted) {
+        setState(() {
+          _statusMessage = result['error'] ?? 'Error en predicción';
+        });
       }
     } catch (e) {
-      debugPrint('[Cam] Error extrayendo plano Y: $e');
-      _isProcessing = false;
-      return;
-    }
-
-    // La corrección de rotación se aplica en tflite_native.dart basándose en
-    // sensorOrientation. En cámaras traseras Android suele ser 90°.
-    final int sensorRotation =
-        _cameraController?.description.sensorOrientation ?? 0;
-    debugPrint('[Cam] Frame ${width}x${height} rot=${sensorRotation}° fmt=${cameraImage.format.group}');
-
-    _tfliteClassifier!
-        .predictFromCamera(yPlane, width, height, bytesPerRow, sensorRotation)
-        .then((result) {
-          if (result['success'] == true && mounted) {
-            final double conf = (result['confidence'] as double?) ?? 0.0;
-            setState(() {
-              _detectedLetter = result['letter'] ?? '-';
-              _confidence = conf;
-            });
-          } else if (mounted) {
-            setState(() {
-              _statusMessage = result['error'] ?? 'Error en predicción';
-            });
-          }
-        })
-        .catchError((Object e) {
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'Error en inferencia: $e';
-            });
-          }
-        })
-        .whenComplete(() {
-          if (mounted) {
-            if (!_isAutoDetect) {
-              setState(() { _isProcessing = false; });
-            } else {
-              _isProcessing = false;
-            }
-          }
+      debugPrint('[Capture] Error al capturar y analizar: $e');
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Error de captura: $e';
         });
-  }
-
-  /// Solicita que el próximo frame disponible sea procesado (modo manual).
-  void _triggerManualCapture() {
-    if (!_isTfliteModelLoaded || _isProcessing) return;
-    setState(() {
-      _captureNextFrame = true;
-    });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
   }
 
   /// Prueba el modelo directamente con uno de los PNG de referencia del asset bundle.
@@ -534,67 +440,6 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
             ),
 
             const SizedBox(height: 8),
-
-            // Sección: Modo de Detección
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'MODO DE DETECCIÓN',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                  color: Colors.white.withOpacity(0.35),
-                ),
-              ),
-            ),
-
-            // Tile de Detección Automática
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1B33),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _isAutoDetect
-                      ? const Color(0xFF00F2FE).withOpacity(0.25)
-                      : Colors.white.withOpacity(0.05),
-                  width: 1,
-                ),
-              ),
-              child: SwitchListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                title: const Text(
-                  'Detección Automática',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                subtitle: Text(
-                  _isAutoDetect
-                      ? 'Analizando en tiempo real'
-                      : 'Captura manual con botón',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
-                    fontSize: 11,
-                  ),
-                ),
-                secondary: Icon(
-                  _isAutoDetect ? Icons.autorenew_rounded : Icons.touch_app_outlined,
-                  color: _isAutoDetect ? const Color(0xFF00F2FE) : Colors.white38,
-                  size: 22,
-                ),
-                value: _isAutoDetect,
-                activeColor: const Color(0xFF00F2FE),
-                onChanged: (val) {
-                  setState(() {
-                    _isAutoDetect = val;
-                  });
-                },
-              ),
-            ),
 
             const SizedBox(height: 12),
 
@@ -956,64 +801,8 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
                   ),
                 ),
 
-              // HUD del Escáner Láser
-              if (_isCameraInitialized && _isAutoDetect && _isTfliteModelLoaded)
-                AnimatedBuilder(
-                  animation: _scannerAnimation,
-                  builder: (context, child) {
-                    return Stack(
-                      children: [
-                        // Línea horizontal de escaneo
-                        Positioned(
-                          top: _scannerAnimation.value * (containerHeight * 0.8),
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 3,
-                            decoration: BoxDecoration(
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF00F2FE).withOpacity(0.8),
-                                  blurRadius: 12,
-                                  spreadRadius: 3,
-                                ),
-                              ],
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Colors.transparent,
-                                  Color(0xFF00F2FE),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Resplandor del escáner
-                        Positioned(
-                          top: 0,
-                          bottom: (1.0 - _scannerAnimation.value) * (containerHeight * 0.8),
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                                colors: [
-                                  const Color(0xFF00F2FE).withOpacity(0.05),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-
-              // Capa de Escaneo Manual / Procesando (Solo visible en modo manual para evitar parpadeos)
-              if (_isProcessing && !_isAutoDetect)
+              // Capa de Procesando (Solo visible durante la captura e inferencia)
+              if (_isProcessing)
                 Container(
                   color: Colors.black.withOpacity(0.4),
                   child: const Center(
@@ -1152,82 +941,80 @@ class _SignLanguageScreenState extends State<SignLanguageScreen>
             ),
             const SizedBox(height: 15),
 
-            // Botón de Disparo Manual (solo visible en modo manual)
-            if (!_isAutoDetect) ...[
-              ElevatedButton(
-                onPressed: _isTfliteModelLoaded && !_isProcessing ? _triggerManualCapture : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00F2FE),
-                  foregroundColor: Colors.black,
-                  shadowColor: const Color(0xFF00F2FE).withOpacity(0.4),
-                  elevation: 8,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.camera_alt_outlined),
-                    SizedBox(width: 8),
-                    Text(
-                      'CAPTURAR Y ANALIZAR',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
+            // Botón de Disparo Manual
+            ElevatedButton(
+              onPressed: _isTfliteModelLoaded && !_isProcessing ? _captureAndAnalyze : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00F2FE),
+                foregroundColor: Colors.black,
+                shadowColor: const Color(0xFF00F2FE).withOpacity(0.4),
+                elevation: 8,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              // Botones de prueba directa con los PNG de referencia
-              // Equivalente a ejecutar deteccion.py con letra_a.png / letra_u.png
-              Row(
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isTfliteModelLoaded && !_isProcessing
-                          ? () => _testWithAsset('assets/letra_a.png')
-                          : null,
-                      icon: const Icon(Icons.image_outlined, size: 16),
-                      label: const Text(
-                        'TEST A',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF00FF87),
-                        side: const BorderSide(color: Color(0xFF00FF87), width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isTfliteModelLoaded && !_isProcessing
-                          ? () => _testWithAsset('assets/letra_u.png')
-                          : null,
-                      icon: const Icon(Icons.image_outlined, size: 16),
-                      label: const Text(
-                        'TEST U',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF00FF87),
-                        side: const BorderSide(color: Color(0xFF00FF87), width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
+                  Icon(Icons.camera_alt_outlined),
+                  SizedBox(width: 8),
+                  Text(
+                    'CAPTURAR Y ANALIZAR',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 15),
-            ],
+            ),
+            const SizedBox(height: 10),
+
+            // Botones de prueba directa con los PNG de referencia
+            // Equivalente a ejecutar deteccion.py con letra_a.png / letra_u.png
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isTfliteModelLoaded && !_isProcessing
+                        ? () => _testWithAsset('assets/letra_a.png')
+                        : null,
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text(
+                      'TEST A',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF00FF87),
+                      side: const BorderSide(color: Color(0xFF00FF87), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isTfliteModelLoaded && !_isProcessing
+                        ? () => _testWithAsset('assets/letra_u.png')
+                        : null,
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text(
+                      'TEST U',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF00FF87),
+                      side: const BorderSide(color: Color(0xFF00FF87), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
           ],
         ),
       ),
