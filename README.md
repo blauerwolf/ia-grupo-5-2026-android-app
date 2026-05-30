@@ -4,104 +4,129 @@
 [![TensorFlow Lite](https://img.shields.io/badge/TensorFlow%20Lite-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)](https://www.tensorflow.org/lite)
 [![Licencia](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
-Una aplicación móvil y desktop premium desarrollada en **Flutter** para la cátedra de **Inteligencia Artificial (2026)** de la **Universidad Tecnológica Nacional - Facultad Regional La Plata (UTN FRLP)** por el **Grupo 5**. 
+Una aplicación móvil y desktop desarrollada en **Flutter** para la cátedra de **Inteligencia Artificial (2026)** de la **Universidad Tecnológica Nacional - Facultad Regional La Plata (UTN FRLP)** por el **Grupo 5**.
 
-La aplicación integra un motor de inferencia local basado en **TensorFlow Lite** para clasificar señas correspondientes a letras del abecedario dactilológico (ASL MNIST / ASL Alphabet) de forma 100% offline, privada y eficiente.
+La aplicación integra un motor de inferencia local basado en **TensorFlow Lite** para clasificar señas correspondientes a letras del abecedario dactilológico (ASL MNIST / ASL Alphabet) de forma **100% offline**, privada y eficiente.
 
 ---
 
-## Características Principales
+# Características Principales
 
-**Motor TFLite Offline Local Nativo**: Inferencia directa en el dispositivo en un hilo dedicado, garantizando máxima privacidad, latencia ultra baja (~1-5 ms) y funcionamiento autónomo sin necesidad de internet ni servidores externos.
+- **Motor TFLite Offline Local Nativo**: inferencia directa en el dispositivo en un hilo dedicado, garantizando máxima privacidad, latencia ultra baja (~1-5 ms) y funcionamiento autónomo sin necesidad de internet ni servidores externos.
 
-**Detección por Captura Manual (Snapshot)**: En lugar de saturar el hardware con streams de video constantes, el usuario encuadra su mano dentro de la guía y presiona **"CAPTURAR Y ANALIZAR"**. El sistema toma una foto real en alta resolución mediante `CameraController.takePicture()`, lee sus bytes e inicia el pipeline.
+- **Detección por Captura Manual (Snapshot)**: en lugar de mantener un flujo continuo de video, el usuario encuadra su mano dentro de la guía y presiona **"CAPTURAR Y ANALIZAR"**. El sistema toma una fotografía mediante `CameraController.takePicture()`, procesa la imagen y ejecuta la inferencia.
 
-**Toggle Inteligente de Lente (Frontal/Trasera)**: Un botón dinámico en la cabecera permite alternar al instante entre las cámaras frontal y trasera.
+- **Toggle Inteligente de Lente (Frontal/Trasera)**: permite alternar rápidamente entre las cámaras disponibles.
 
-**Espejado y Ajustes Automáticos**: La aplicación espeja automáticamente la vista previa y la inferencia al usar la cámara frontal para una visualización natural del usuario, y desactiva el espejado al cambiar a la cámara trasera.
+- **Espejado y Ajustes Automáticos**: la aplicación adapta automáticamente el espejado según la cámara seleccionada.
 
-**Panel de Calibración**:
-    *   **Área de Enfoque (Crop Fraction)**: Controla visualmente el porcentaje del centro de la pantalla analizado por el modelo (de 20% a 100%).
-    *   **Espejar Cámara Manual**: Switch para invertir horizontalmente de forma forzada si es necesario.
-    *   **Contraste Adaptativo**: Estiramiento de histograma dinámico min-max integrado en el preprocesamiento de tensores.
+- **Panel de Calibración**:
+  - **Área de Enfoque (Crop Fraction)**: controla el porcentaje central de la imagen utilizado para el análisis.
+  - **Espejar Cámara Manual**: permite invertir horizontalmente la imagen cuando sea necesario.
+  - **Contraste Adaptativo**: aplica estiramiento dinámico de histograma durante el preprocesamiento.
+
 ---
 
-## Pipeline de Preprocesamiento de Imagen
+# Pipeline de Preprocesamiento de Imagen
 
-Para garantizar que el modelo clasifique con precisión, el preprocesamiento replica de forma matemática y exacta el flujo de entrenamiento del dataset original y del script de referencia `deteccion.py`:
+Para garantizar una clasificación precisa, el preprocesamiento replica el flujo utilizado durante el entrenamiento del modelo:
 
 ```mermaid
 graph TD
     A[Foto JPEG de Cámara] --> B[Decodificación en img.Image de Dart]
-    B --> C[Recorte Cuadrado Central segun CropFraction]
-    C --> D[Conversión a Escala de Grises - Luma formula]
+    B --> C[Recorte Cuadrado Central según CropFraction]
+    C --> D[Conversión a Escala de Grises]
     D --> E{¿Contraste Adaptativo?}
-    E -- Sí --> F[Histogram Stretch min-max]
-    E -- No --> G[Normalización directa / 255.0]
-    F --> H[Resize a 28x28 píxeles con Interpolación Cúbica]
+    E -- Sí --> F[Histogram Stretch Min-Max]
+    E -- No --> G[Normalización Directa / 255.0]
+    F --> H[Resize a 28x28 píxeles]
     G --> H
-    H --> I[Carga en Tensor 1, 28, 28, 1]
-    I --> J[Ejecución en Interprete TFLite]
-    J --> K[Argmax: Obtención de Letra y Confianza]
+    H --> I[Carga en Tensor 1x28x28x1]
+    I --> J[Ejecución en Intérprete TFLite]
+    J --> K[Obtención de Letra y Confianza]
 ```
 
-**Resize Cúbico**: La librería de imágenes nativa de Dart utiliza interpolación cúbica para aproximar con exactitud el filtro `LANCZOS` empleado en el entorno Python PIL original, evitando que la reducción agresiva a 28x28 píxeles genere ruido matemático.
+**Resize Cúbico:** la librería de imágenes nativa de Dart utiliza interpolación cúbica para aproximar el comportamiento del filtro `LANCZOS` empleado durante el entrenamiento original, minimizando pérdidas de información durante la reducción a 28x28 píxeles.
 
 ---
 
-## Guía de Instalación y Ejecución
+# Guía de Instalación y Ejecución
 
-### Prerrequisitos
-*   **Flutter SDK**: `>=3.18.0` (recomendado el uso del canal estable).
-*   **Cocoapods** (para macOS/iOS).
-*   Dispositivo físico o emulador con soporte de cámara y FFI.
+## Prerrequisitos
 
-### Paso 1: Clonar el Repositorio
+- **Flutter SDK** `>=3.18.0`
+- **Cocoapods** (para macOS/iOS)
+- Dispositivo físico o emulador con soporte de cámara y FFI
+
+## Paso 1: Clonar el Repositorio
+
 ```bash
 git clone https://github.com/blauerwolf/ia-grupo-5-2026-android-app.git
 cd ia_app
 ```
 
-### Paso 2: Instalar Dependencias
-Instala los plugins de Flutter nativos (incluyendo `tflite_flutter` y `camera`):
+## Paso 2: Instalar Dependencias
+
+Instala los paquetes necesarios:
+
 ```bash
 flutter pub get
 ```
 
-### Paso 3: Configurar Assets
-Asegúrate de que el modelo TFLite y las imágenes de prueba se encuentran en las ubicaciones requeridas indicadas en `pubspec.yaml`:
--   `assets/modelo_sign_language.tflite`
--   `assets/letra_a.png`
--   `assets/letra_u.png`
+## Paso 3: Configurar Assets
 
-### Paso 4: Ejecutar la Aplicación
-Conecta tu celular o inicia un simulador y ejecuta:
+Verifica que exista el siguiente archivo:
+
+- `assets/modelo_sign_language.tflite`
+
+
+## Paso 4: Ejecutar la Aplicación
+
+Conecta un dispositivo físico o inicia un emulador y ejecuta:
+
 ```bash
 flutter run
 ```
 
 ---
 
-## Pruebas Automatizadas
+# Pruebas Automatizadas
 
-El proyecto incluye tests de widgets e integración que verifican la renderización correcta y robusta de la interfaz principal libre de excepciones:
+El proyecto incluye pruebas de widgets e integración para validar la correcta renderización y funcionamiento de la aplicación.
 
-Para correr las pruebas locales ejecuta:
+Para ejecutar la suite de pruebas:
+
 ```bash
 flutter test
 ```
 
 ---
 
-## Integrantes - Grupo 5 (UTN FRLP IA 2026)
+# Tecnologías Utilizadas
 
-**MERETTA, Diego Alberto**. 
-**SUAREZ, Hernan**. 
-**ARDENGHI, Ernesto**. 
-**CANGARO, Ignacio**. 
-**DEL VECCHIO, Guillermo**. 
-**CHOSCO, Nahir**. 
-**GARZANITI, Valentín**. 
-**GIANNELLI, Pilar**. 
+- Flutter
+- Dart
+- TensorFlow Lite
+- Camera Plugin
+- Image Package
+- Flutter Test
+- Material Design 3
 
-*UTN FRLP · Inteligencia Artificial · Año 2026*
+---
+
+# Integrantes · Grupo 5 (UTN FRLP IA 2026)
+
+- Diego Alberto Meretta
+- Hernán Suárez
+- Ernesto Ardenghi
+- Ignacio Cangaro
+- Guillermo Del Vecchio
+- Nahir Chosco
+- Valentín Garzaniti
+- Pilar Giannelli
+
+---
+
+**Universidad Tecnológica Nacional – Facultad Regional La Plata**  
+**Cátedra de Inteligencia Artificial**  
+**Año 2026**
