@@ -13,11 +13,14 @@ La aplicación integra un motor de inferencia local basado en **TensorFlow Lite*
 ## Características Principales
 
 **Motor TFLite Offline Local Nativo**: Inferencia directa en el dispositivo en un hilo dedicado, garantizando máxima privacidad, latencia ultra baja (~1-5 ms) y funcionamiento autónomo sin necesidad de internet ni servidores externos.
-** Detección por Captura Manual (Snapshot)**: En lugar de saturar el hardware con streams de video constantes, el usuario encuadra su mano dentro de la guía y presiona **"CAPTURAR Y ANALIZAR"**. El sistema toma una foto real en alta resolución mediante `CameraController.takePicture()`, lee sus bytes e inicia el pipeline.
+
+**Detección por Captura Manual (Snapshot)**: En lugar de saturar el hardware con streams de video constantes, el usuario encuadra su mano dentro de la guía y presiona **"CAPTURAR Y ANALIZAR"**. El sistema toma una foto real en alta resolución mediante `CameraController.takePicture()`, lee sus bytes e inicia el pipeline.
+
 **Toggle Inteligente de Lente (Frontal/Trasera)**: Un botón dinámico en la cabecera permite alternar al instante entre las cámaras frontal y trasera.
+
 **Espejado y Ajustes Automáticos**: La aplicación espeja automáticamente la vista previa y la inferencia al usar la cámara frontal para una visualización natural del usuario, y desactiva el espejado al cambiar a la cámara trasera.
 
-**Panel de Calibración Premium**:
+**Panel de Calibración**:
     *   **Área de Enfoque (Crop Fraction)**: Controla visualmente el porcentaje del centro de la pantalla analizado por el modelo (de 20% a 100%).
     *   **Espejar Cámara Manual**: Switch para invertir horizontalmente de forma forzada si es necesario.
     *   **Contraste Adaptativo**: Estiramiento de histograma dinámico min-max integrado en el preprocesamiento de tensores.
@@ -92,13 +95,13 @@ flutter test
 
 ## Integrantes - Grupo 5 (UTN FRLP IA 2026)
 
-**MERETTA, Diego Alberto**
-**SUAREZ, Hernan**
-**ARDENGHI, Ernesto**
-**CANGARO, Ignacio**
-**DEL VECCHIO, Guillermo**
-**CHOSCO, Nahir**
-**GARZANITI, Valentín**
-**GIANNELLI, Pilar**
+**MERETTA, Diego Alberto**. 
+**SUAREZ, Hernan**. 
+**ARDENGHI, Ernesto**. 
+**CANGARO, Ignacio**. 
+**DEL VECCHIO, Guillermo**. 
+**CHOSCO, Nahir**. 
+**GARZANITI, Valentín**. 
+**GIANNELLI, Pilar**. 
 
 *UTN FRLP · Inteligencia Artificial · Año 2026*
