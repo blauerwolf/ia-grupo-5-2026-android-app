@@ -66,10 +66,11 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
+  CameraLensDirection _selectedLensDirection = CameraLensDirection.front;
   
   // Parámetros de Calibración
   double _cropFraction = 0.5;
-  bool _mirrorHorizontal = false; // Espejado desactivado por defecto
+  bool _mirrorHorizontal = true; // Espejado activado por defecto para cámara frontal
   bool _contrastStretch = false;
 
   // Clasificador TFLite Condicional
@@ -143,11 +144,24 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
     }
 
     CameraDescription selectedCamera = widget.cameras.first;
+    bool foundCamera = false;
     for (var camera in widget.cameras) {
-      if (camera.lensDirection == CameraLensDirection.front) {
+      if (camera.lensDirection == _selectedLensDirection) {
         selectedCamera = camera;
+        foundCamera = true;
         break;
       }
+    }
+
+    // Fallback si no se encuentra la dirección de lente preferida
+    if (!foundCamera) {
+      _selectedLensDirection = selectedCamera.lensDirection;
+    }
+
+    // Espejado horizontal automático según la lente seleccionada
+    _mirrorHorizontal = (_selectedLensDirection == CameraLensDirection.front);
+    if (_tfliteClassifier != null) {
+      _tfliteClassifier!.mirrorHorizontal = _mirrorHorizontal;
     }
 
     _cameraController = CameraController(
@@ -171,6 +185,28 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
         });
       }
     }
+  }
+
+  /// Alterne dinámicamente entre cámara frontal y trasera
+  Future<void> _toggleCamera() async {
+    if (_cameraController == null || !_isCameraInitialized || _isProcessing) return;
+
+    setState(() {
+      _isCameraInitialized = false;
+      _statusMessage = 'Cambiando de cámara...';
+    });
+
+    try {
+      await _cameraController?.dispose();
+    } catch (e) {
+      debugPrint('[Cam] Error al liberar cámara: $e');
+    }
+
+    _selectedLensDirection = (_selectedLensDirection == CameraLensDirection.front)
+        ? CameraLensDirection.back
+        : CameraLensDirection.front;
+
+    await _initializeCamera();
   }
 
   /// Captura una foto y realiza la inferencia TFLite offline de manera asíncrona.
@@ -636,6 +672,34 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
           ),
         ),
 
+        const SizedBox(width: 8),
+
+        // Botón de alternar cámara (frontal / trasera)
+        GestureDetector(
+          onTap: _isCameraInitialized && !_isProcessing ? _toggleCamera : null,
+          child: Opacity(
+            opacity: _isCameraInitialized && !_isProcessing ? 1.0 : 0.4,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1B33),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF9B51E0).withOpacity(0.15),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                _selectedLensDirection == CameraLensDirection.front
+                    ? Icons.camera_front_rounded
+                    : Icons.camera_rear_rounded,
+                color: const Color(0xFF9B51E0),
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+
         const SizedBox(width: 12),
 
         // Título centrado / expandido
@@ -680,61 +744,6 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
                 style: TextStyle(
                   color: Color(0xFF8B88A5),
                   fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(width: 10),
-
-        // Indicador de Estado del Motor
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _isTfliteModelLoaded
-                ? const Color(0x1100FF87)
-                : const Color(0x11FF2E93),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: _isTfliteModelLoaded
-                  ? const Color(0xFF00FF87).withOpacity(0.3)
-                  : const Color(0xFFFF2E93).withOpacity(0.3),
-              width: 1.2,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: _isTfliteModelLoaded
-                      ? const Color(0xFF00FF87)
-                      : const Color(0xFFFF2E93),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _isTfliteModelLoaded
-                          ? const Color(0xFF00FF87).withOpacity(0.6)
-                          : const Color(0xFFFF2E93).withOpacity(0.6),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _isTfliteModelLoaded ? 'OFFLINE OK' : 'CARGANDO',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  color: _isTfliteModelLoaded
-                      ? const Color(0xFF00FF87)
-                      : const Color(0xFFFF2E93),
                 ),
               ),
             ],
