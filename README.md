@@ -10,19 +10,20 @@ La aplicación integra un motor de inferencia local basado en **TensorFlow Lite*
 
 ---
 
-## ✨ Características Principales
+## Características Principales
 
-*   **🧠 Motor TFLite Offline Local Nativo**: Inferencia directa en el dispositivo en un hilo dedicado, garantizando máxima privacidad, latencia ultra baja (~1-5 ms) y funcionamiento autónomo sin necesidad de internet ni servidores externos.
-*   **📸 Detección por Captura Manual (Snapshot)**: En lugar de saturar el hardware con streams de video constantes, el usuario encuadra su mano dentro de la guía y presiona **"CAPTURAR Y ANALIZAR"**. El sistema toma una foto real en alta resolución mediante `CameraController.takePicture()`, lee sus bytes e inicia el pipeline.
-*   **🔄 Toggle Inteligente de Lente (Frontal/Trasera)**: Un botón dinámico en la cabecera permite alternar al instante entre las cámaras frontal y trasera.
-*   **🪞 Espejado y Ajustes Automáticos**: La aplicación espeja automáticamente la vista previa y la inferencia al usar la cámara frontal para una visualización natural del usuario, y desactiva el espejado al cambiar a la cámara trasera.
-*   **⚙️ Panel de Calibración Premium**:
+** Motor TFLite Offline Local Nativo**: Inferencia directa en el dispositivo en un hilo dedicado, garantizando máxima privacidad, latencia ultra baja (~1-5 ms) y funcionamiento autónomo sin necesidad de internet ni servidores externos.
+** Detección por Captura Manual (Snapshot)**: En lugar de saturar el hardware con streams de video constantes, el usuario encuadra su mano dentro de la guía y presiona **"CAPTURAR Y ANALIZAR"**. El sistema toma una foto real en alta resolución mediante `CameraController.takePicture()`, lee sus bytes e inicia el pipeline.
+** Toggle Inteligente de Lente (Frontal/Trasera)**: Un botón dinámico en la cabecera permite alternar al instante entre las cámaras frontal y trasera.
+** Espejado y Ajustes Automáticos**: La aplicación espeja automáticamente la vista previa y la inferencia al usar la cámara frontal para una visualización natural del usuario, y desactiva el espejado al cambiar a la cámara trasera.
+
+** Panel de Calibración Premium**:
     *   **Área de Enfoque (Crop Fraction)**: Controla visualmente el porcentaje del centro de la pantalla analizado por el modelo (de 20% a 100%).
     *   **Espejar Cámara Manual**: Switch para invertir horizontalmente de forma forzada si es necesario.
     *   **Contraste Adaptativo**: Estiramiento de histograma dinámico min-max integrado en el preprocesamiento de tensores.
 ---
 
-## 🛠️ Pipeline de Preprocesamiento de Imagen
+## Pipeline de Preprocesamiento de Imagen
 
 Para garantizar que el modelo clasifique con precisión, el preprocesamiento replica de forma matemática y exacta el flujo de entrenamiento del dataset original y del script de referencia `deteccion.py`:
 
@@ -41,11 +42,11 @@ graph TD
     J --> K[Argmax: Obtención de Letra y Confianza]
 ```
 
-*   **Resize Cúbico**: La librería de imágenes nativa de Dart utiliza interpolación cúbica para aproximar con exactitud el filtro `LANCZOS` empleado en el entorno Python PIL original, evitando que la reducción agresiva a 28x28 píxeles genere ruido matemático.
+**Resize Cúbico**: La librería de imágenes nativa de Dart utiliza interpolación cúbica para aproximar con exactitud el filtro `LANCZOS` empleado en el entorno Python PIL original, evitando que la reducción agresiva a 28x28 píxeles genere ruido matemático.
 
 ---
 
-## 🚀 Guía de Instalación y Ejecución
+## Guía de Instalación y Ejecución
 
 ### Prerrequisitos
 *   **Flutter SDK**: `>=3.18.0` (recomendado el uso del canal estable).
@@ -78,7 +79,7 @@ flutter run
 
 ---
 
-## 🧪 Pruebas Automatizadas
+## Pruebas Automatizadas
 
 El proyecto incluye tests de widgets e integración que verifican la renderización correcta y robusta de la interfaz principal libre de excepciones:
 
@@ -89,10 +90,15 @@ flutter test
 
 ---
 
-## 👥 Integrantes - Grupo 5 (UTN FRLP IA 2026)
+## Integrantes - Grupo 5 (UTN FRLP IA 2026)
 
-*   **Estudiante 1** - [blauerwolf](https://github.com/blauerwolf) (o nombres reales de los participantes del grupo)
-*   **Estudiante 2**
-*   **Estudiante 3**
+** MERETTA, Diego Alberto **
+** SUAREZ, Hernan **
+** ARDENGHI, Ernesto **
+** CANGARO, Ignacio **
+** DEL VECCHIO, Guillermo **
+** CHOSCO, Nahir **
+** GARZANITI, Valentín **
+** GIANNELLI, Pilar **
 
 *UTN FRLP · Inteligencia Artificial · Año 2026*
