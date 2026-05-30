@@ -1,9 +1,5 @@
 # Detección de Lenguaje de Señas (ASL) · UTN FRLP 2026
 
-[![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev/)
-[![TensorFlow Lite](https://img.shields.io/badge/TensorFlow%20Lite-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)](https://www.tensorflow.org/lite)
-[![Licencia](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
-
 Una aplicación móvil y desktop desarrollada en **Flutter** para la cátedra de **Inteligencia Artificial (2026)** de la **Universidad Tecnológica Nacional - Facultad Regional La Plata (UTN FRLP)** por el **Grupo 5**.
 
 La aplicación integra un motor de inferencia local basado en **TensorFlow Lite** para clasificar señas correspondientes a letras del abecedario dactilológico (ASL MNIST / ASL Alphabet) de forma **100% offline**, privada y eficiente.
