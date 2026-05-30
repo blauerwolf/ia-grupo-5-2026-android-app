@@ -257,35 +257,6 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
     }
   }
 
-  /// Prueba el modelo directamente con uno de los PNG de referencia del asset bundle.
-  /// Permite verificar que el pipeline Dart reproduce los resultados de deteccion.py
-  /// sin involucrar la cámara. Si Python detecta A con letra_a.png y Flutter también,
-  /// el pipeline base es correcto; si difieren, hay un bug de preprocesamiento.
-  Future<void> _testWithAsset(String assetPath) async {
-    if (!_isTfliteModelLoaded || _isProcessing) return;
-    setState(() { _isProcessing = true; });
-    try {
-      final ByteData data = await rootBundle.load(assetPath);
-      final Uint8List bytes = data.buffer.asUint8List();
-      debugPrint('[Test] Probando con asset: $assetPath (${bytes.lengthInBytes} bytes)');
-      final result = await _tfliteClassifier!.predict(bytes);
-      if (result['success'] == true && mounted) {
-        final double conf = (result['confidence'] as double?) ?? 0.0;
-        setState(() {
-          _detectedLetter = result['letter'] ?? '-';
-          _confidence = conf;
-          _statusMessage = 'Test asset: $assetPath';
-        });
-        debugPrint('[Test] Resultado: letra=${result["letter"]} conf=${(conf*100).toStringAsFixed(1)}%');
-      }
-    } catch (e) {
-      debugPrint('[Test] Error al probar asset: $e');
-      if (mounted) setState(() { _statusMessage = 'Error al leer asset: $e'; });
-    } finally {
-      if (mounted) setState(() { _isProcessing = false; });
-    }
-  }
-
   // Retorna un color degradado según el nivel de confianza
   Color _getConfidenceColor(double conf) {
     if (conf >= 0.75) return const Color(0xFF00FF87); // Emerald Neon Green
@@ -689,11 +660,9 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
                   width: 1,
                 ),
               ),
-              child: Icon(
-                _selectedLensDirection == CameraLensDirection.front
-                    ? Icons.camera_front_rounded
-                    : Icons.camera_rear_rounded,
-                color: const Color(0xFF9B51E0),
+              child: const Icon(
+                Icons.switch_camera_rounded,
+                color: Color(0xFF9B51E0),
                 size: 22,
               ),
             ),
@@ -978,52 +947,6 @@ class _SignLanguageScreenState extends State<SignLanguageScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-
-            // Botones de prueba directa con los PNG de referencia
-            // Equivalente a ejecutar deteccion.py con letra_a.png / letra_u.png
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isTfliteModelLoaded && !_isProcessing
-                        ? () => _testWithAsset('assets/letra_a.png')
-                        : null,
-                    icon: const Icon(Icons.image_outlined, size: 16),
-                    label: const Text(
-                      'TEST A',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF00FF87),
-                      side: const BorderSide(color: Color(0xFF00FF87), width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isTfliteModelLoaded && !_isProcessing
-                        ? () => _testWithAsset('assets/letra_u.png')
-                        : null,
-                    icon: const Icon(Icons.image_outlined, size: 16),
-                    label: const Text(
-                      'TEST U',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF00FF87),
-                      side: const BorderSide(color: Color(0xFF00FF87), width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
           ],
         ),
       ),

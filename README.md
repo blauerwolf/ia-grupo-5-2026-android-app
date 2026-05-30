@@ -20,8 +20,6 @@ La aplicación integra un motor de inferencia local basado en **TensorFlow Lite*
     *   **Área de Enfoque (Crop Fraction)**: Controla visualmente el porcentaje del centro de la pantalla analizado por el modelo (de 20% a 100%).
     *   **Espejar Cámara Manual**: Switch para invertir horizontalmente de forma forzada si es necesario.
     *   **Contraste Adaptativo**: Estiramiento de histograma dinámico min-max integrado en el preprocesamiento de tensores.
-*   **🧪 Validación por Referencia de Assets (TEST A / TEST U)**: Botones de depuración integrados para probar el modelo localmente usando imágenes fijas de assets (`letra_a.png` y `letra_u.png`) para corroborar la consistencia matemática y de preprocesamiento exacta frente al script de referencia en Python `deteccion.py`.
-
 ---
 
 ## 🛠️ Pipeline de Preprocesamiento de Imagen
@@ -30,7 +28,7 @@ Para garantizar que el modelo clasifique con precisión, el preprocesamiento rep
 
 ```mermaid
 graph TD
-    A[Foto JPEG de Cámara / Asset] --> B[Decodificación en img.Image de Dart]
+    A[Foto JPEG de Cámara] --> B[Decodificación en img.Image de Dart]
     B --> C[Recorte Cuadrado Central segun CropFraction]
     C --> D[Conversión a Escala de Grises - Luma formula]
     D --> E{¿Contraste Adaptativo?}
