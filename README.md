@@ -1,4 +1,4 @@
-# 🤟 Detección de Lenguaje de Señas (ASL) · UTN FRLP 2026
+# Detección de Lenguaje de Señas (ASL) · UTN FRLP 2026
 
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev/)
 [![TensorFlow Lite](https://img.shields.io/badge/TensorFlow%20Lite-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)](https://www.tensorflow.org/lite)
